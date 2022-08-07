@@ -25,7 +25,7 @@ public class Member {
     @Embedded
     private Address address;
 
-    @JsonIgnore
+    @JsonIgnore // 화면을 위한 기능들이 Entity에 의존됨
     @OneToMany(mappedBy = "member")
     private List<Order> orders = new ArrayList<>();
 
