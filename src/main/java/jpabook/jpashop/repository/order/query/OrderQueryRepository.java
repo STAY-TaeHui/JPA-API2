@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 @Repository
 @RequiredArgsConstructor
 public class OrderQueryRepository {
+    // 특정화면(VIEW)에 맞게 가져오고 싶을때
 
     private final EntityManager em;
 
@@ -23,12 +24,10 @@ public class OrderQueryRepository {
         //루트 조회(toOne 코드를 모두 한번에 조회)
         List<OrderQueryDto> result = findOrders();
 
+
         //루프를 돌면서 컬렉션 추가(추가 쿼리 실행)
-        result.forEach(o -> {
-            List<OrderItemQueryDto> orderItems = findOrderItems(o.getOrderId());
-            o.setOrderItems(orderItems);
-        });
-        return result;
+        return null;
+
     }
 
     /**
@@ -36,11 +35,10 @@ public class OrderQueryRepository {
      */
     private List<OrderQueryDto> findOrders() {
         return em.createQuery(
-                "select new jpabook.jpashop.repository.order.query.OrderQueryDto(o.id, m.name, o.orderDate, o.status, d.address)" +
-                        " from Order o" +
-                        " join o.member m" +
-                        " join o.delivery d", OrderQueryDto.class)
-                .getResultList();
+            "select new jpabook.jpashop.repository.order.query.OrderQueryDto(o.id,m.name,o.orderDate,o.status, d.address)" +
+                " from Order o" +
+                " join o.member m" +
+                " join o.delivery d", OrderQueryDto.class).getResultList();
     }
 
     /**
