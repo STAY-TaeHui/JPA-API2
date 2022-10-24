@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 
 @Data
 public class OrderFlatDto {
+//한방쿼리로
+//SELECT 된 데이터를 그대로 FLAT 형태로 가져옴
 
     private Long orderId;
     private String name;

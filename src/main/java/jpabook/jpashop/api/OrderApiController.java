@@ -1,15 +1,16 @@
 package jpabook.jpashop.api;
 
-import static java.util.stream.Collectors.toList;
-
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import jpabook.jpashop.domain.Address;
 import jpabook.jpashop.domain.Order;
 import jpabook.jpashop.domain.OrderItem;
 import jpabook.jpashop.domain.OrderStatus;
 import jpabook.jpashop.repository.OrderRepository;
+import jpabook.jpashop.repository.order.query.OrderFlatDto;
+import jpabook.jpashop.repository.order.query.OrderItemQueryDto;
 import jpabook.jpashop.repository.order.query.OrderQueryDto;
 import jpabook.jpashop.repository.order.query.OrderQueryRepository;
 import lombok.Data;
@@ -17,6 +18,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import static java.util.stream.Collectors.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -57,6 +60,10 @@ public class OrderApiController
         List<Order> allWithItem = orderRepository.findAllWithItem2();
         return allWithItem;
     }
+    /*
+    * 컬렉션은 페치 조인시 페이징이 불가능
+    * ToOne 관계는 페치 조인으로 쿼리 수 최적화
+    * 컬렉션은 페치조인 댓니에 지연로딩을 유지하고 @BatchSize 로 최적화 -> IN 절 */
     @GetMapping("/api/v3.1/orders")
     public List<OrderDto> ordersV3_page(@RequestParam(value = "offset",defaultValue = "0") int offset,
                                         @RequestParam(value = "limit", defaultValue = "100") int limit) {
@@ -66,12 +73,55 @@ public class OrderApiController
             .collect(toList());
         return result;
     }
-    @GetMapping("/api/v4/orders")
+
+    /*
+    * JPA에서 DTO를 직접 조회
+    * */
+   @GetMapping("/api/v4/orders")
     public List<OrderQueryDto> ordersV4(){
         return orderQueryRepository.findOrderQueryDtos();
     }
 
+    /*
+    * 컬렉션 조회 최적화 - 데이터가 뻥튀기 될때
+    * IN절을 활용해서 메모리에 미리 조회해서 반복문 돌리면서 최적화
+    * --> 하지만 Entity로 조회하게 되면 @BatchSize로 가능하다.
+    * */
+    @GetMapping("/api/v5/orders")
+    public List<OrderQueryDto> ordersV5(){
+        return orderQueryRepository.findAllByDto_optimization();
+    }
 
+    /*
+    * 플랫 데이터 최적화
+    * JOIN결과를 그대로 조회 후 Application 단에서 원하는 모양으로 변환*/
+    @GetMapping("/api/v6/orders")
+    public List<OrderQueryDto> ordersV6(){
+        List<OrderFlatDto> flats = orderQueryRepository.findAllByDto_flat();
+        return flats.stream()
+                .collect(groupingBy(o -> new OrderQueryDto(o.getOrderId(),
+                        o.getName(), o.getOrderDate(), o.getOrderStatus(), o.getAddress()),
+                        mapping(o -> new OrderItemQueryDto(o.getOrderId(), o.getItemName(), o.getOrderPrice(),o.getCount()), toList())))
+                .entrySet().stream()
+                .map(e -> new OrderQueryDto(e.getKey().getOrderId(),
+                        e.getKey().getName(), e.getKey().getOrderDate(), e.getKey().getOrderStatus(),
+                        e.getKey().getAddress(), e.getValue()))
+                .collect(toList());
+    }
+
+
+    /*  --- 정리 ---
+    * 권장 순서
+    * 1. 엔티티 조회 방식으로 우선 접근
+    *   1. 페치조인으로 쿼리수 최적화
+    *   2. 컬렉션 최적화
+    *       1. 페이징 필요 -> @BatchSize 로 최적화
+    *       2. 페이징 필요 X -> 페치 조인 사용
+    * 2. 엔티티 조회방식으로 안되면 DTO로 직접 조회
+    * 3. DTO 직접조회로 해결이 안되면 NativeSQL
+    *
+    * 캐시가 필요할 땐 Entity를 캐싱하지 말고 DTO를 캐싱!!
+    * */
     @Data
     private static class OrderDto
     {
